@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Tic Tac Toe</title>
+
+<style>
+
+body{
+    font-family: Arial;
+    text-align: center;
+    margin-top: 60px;
+    background:#f5f5f5;
+}
+
+input{
+    padding:8px;
+}
+
+button{
+    padding:8px 12px;
+    cursor:pointer;
+}
+
+#status{
+    margin-top:20px;
+    font-size:20px;
+    font-weight:bold;
+}
+
+#symbol{
+    font-size:18px;
+    margin-top:10px;
+}
+
+#board{
+    width:200px;
+    margin:30px auto;
+    display:grid;
+    grid-template-columns:65px 65px 65px;
+    grid-template-rows:65px 65px 65px;
+    gap:8px;
+}
+
+.cell{
+    width:65px;
+    height:65px;
+    border:2px solid #444;
+    border-radius:8px;
+    background:white;
+    font-size:32px;
+    font-weight:bold;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    cursor:pointer;
+    transition:0.2s;
+}
+
+.cell:hover{
+    background:#e8e8e8;
+}
+
+.x{
+    color:#e74c3c;
+}
+
+.o{
+    color:#2980b9;
+}
+
+</style>
+</head>
+
+<body>
+
+<h2>Tic Tac Toe</h2>
+
+<div id="login">
+<input type="text" id="playerName" placeholder="Enter your name">
+<button id="connectBtn" onclick="connect()">Connect</button>
+</div>
+
+<div id="status">Not Connected</div>
+
+<div id="symbol"></div>
+
+<div id="board">
+<div class="cell" data-id="0"></div>
+<div class="cell" data-id="1"></div>
+<div class="cell" data-id="2"></div>
+<div class="cell" data-id="3"></div>
+<div class="cell" data-id="4"></div>
+<div class="cell" data-id="5"></div>
+<div class="cell" data-id="6"></div>
+<div class="cell" data-id="7"></div>
+<div class="cell" data-id="8"></div>
+</div>
+
+<script>
+
+let socket;
+let myTurn=false;
+
+function resetBoard()
+{
+    document.querySelectorAll(".cell").forEach(cell=>{
+        cell.innerText="";
+        cell.classList.remove("x");
+        cell.classList.remove("o");
+    });
+
+    myTurn=false;
+    document.getElementById("status").innerText="Game Starting...";
+}
+
+function connect()
+{
+    const name=document.getElementById("playerName").value;
+
+    if(name==="")
+    {
+        alert("Enter player name");
+        return;
+    }
+
+    socket=new WebSocket("ws://localhost:8080");
+
+    socket.onopen=function()
+    {
+        document.getElementById("status").innerText="Connected to server";
+
+        document.getElementById("connectBtn").disabled=true;
+
+        socket.send("REGISTER:"+name);
+    };
+
+    socket.onmessage=function(event)
+    {
+        const msg=event.data;
+
+        if(msg==="X")
+        {
+            resetBoard();
+
+            document.getElementById("symbol").innerText=
+            "You are playing with X";
+        }
+        else if(msg==="O")
+        {
+            resetBoard();
+
+            document.getElementById("symbol").innerText=
+            "You are playing with O";
+        }
+        else if(msg==="MAX")
+        {
+            alert("Maximum number of players reached");
+            socket.close();
+            document.getElementById("connectBtn").disabled=true;
+        }
+        else if(msg==="YOUR_TURN")
+        {
+            myTurn=true;
+            document.getElementById("status").innerText="Your Turn";
+        }
+        else if(msg==="WAIT")
+        {
+            myTurn=false;
+            document.getElementById("status").innerText="Opponent Turn";
+        }
+        else if(msg.startsWith("MOVE"))
+        {
+            let parts=msg.split(":");
+
+            let pos=parts[1];
+            let sym=parts[2];
+
+            let cell=document.querySelectorAll(".cell")[pos];
+
+            cell.innerText=sym;
+
+            if(sym==="X")
+                cell.classList.add("x");
+            else
+                cell.classList.add("o");
+        }
+        else if(msg==="INVALID")
+        {
+            alert("Invalid move");
+        }
+        else if(msg==="WIN")
+        {
+            document.getElementById("status").innerText="You Won!";
+            alert("You Won!");
+            myTurn=false;
+        }
+        else if(msg==="LOSE")
+        {
+            document.getElementById("status").innerText="You Lost!";
+            alert("You Lost!");
+            myTurn=false;
+        }
+        else if(msg==="DRAW")
+        {
+            document.getElementById("status").innerText="Game Draw!";
+            alert("Game Draw!");
+            myTurn=false;
+        }
+        else if(msg==="OPPONENT_LEFT")
+        {
+            document.getElementById("status").innerText =
+                "Opponent left. You Won!";
+
+            alert("Opponent disconnected. You Win!");
+
+            myTurn = false;
+        }
+    };
+
+    socket.onclose=function()
+    {
+        document.getElementById("status").innerText="Disconnected from server";
+        myTurn=false;
+    };
+}
+
+document.querySelectorAll(".cell").forEach(cell => {
+
+    cell.addEventListener("click",function(){
+
+        if(!myTurn)
+        {
+            alert("Not your turn");
+            return;
+        }
+
+        if(!socket || socket.readyState!==WebSocket.OPEN)
+            return;
+
+        let pos=this.dataset.id;
+
+        socket.send("MOVE:"+pos);
+    });
+
+});
+
+</script>
+
+</body>
+</html>
